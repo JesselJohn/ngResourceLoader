@@ -12,6 +12,8 @@
     }
 }
 
-.ty-async-img.ty-smooth-load.loaded {
-    opacity: 10;
+.ty-smooth-load {
+    &.loaded {
+        opacity: 1;
+    }
 }
