@@ -6,7 +6,7 @@
  */
 ! function(window, document, undefined) {
     angular.module('ng.resourceloader',[])
-        .directive('ngLazyLoadImg', ['$window', '$timeout', function($window, $timeout) {
+        .directive('ngLazyLoadImg', ['$window', '$rootScope', '$timeout', function($window, $rootScope, $timeout) {
             var objOfOnLoadImgElems = {},
                 objOfLazyImgElems = {},
                 objOfLazyImgElemsInViewport = {},
@@ -175,6 +175,13 @@
                     setImageIfInViewportFn(objOfLazyImgElemsInViewport, false);
                 }, 300);
             }, false);
+    
+            $rootScope.$on('trigger.lazyload', function(e) {
+                $timeout(function() {
+                    recalculateOffsetFn();
+                    setImageIfInViewportFn(objOfLazyImgElemsInViewport, false);
+                }, 300);
+            });
     
             return ngLazyLoadImg;
         }]);
