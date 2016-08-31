@@ -9,12 +9,15 @@
         .directive('ngLazyLoadImg', ['$window', '$timeout', function($window, $timeout) {
             var objOfOnLoadImgElems = {},
                 objOfLazyImgElems = {},
+                objOfLazyImgElemsInViewport = {},
+                arrOfPrevDisplayedElements = [],
                 loadTimeoutId,
                 scrollTimeoutId,
                 resizeTimeoutId,
                 ngLazyLoadImg = {
                     scope: {
                         'defaultImage': '=?',
+                        'unLoadOnScroll': '=?',
                         'imgsrc': '=',
                         'onWinLoad': '=?'
                     },
@@ -30,7 +33,7 @@
                         function($scope, $element) {
                             var that = this,
                                 $elementOffsetTop = $element[0].getBoundingClientRect().top;
-
+    
                             function populateLazyElemsFn(obj) {
                                 if (obj[$elementOffsetTop] === undefined) {
                                     obj[$elementOffsetTop] = [];
@@ -41,80 +44,138 @@
                                     'elem': $element
                                 });
                             }
-
-                            !$scope.onWinLoad ?
-                                populateLazyElemsFn(objOfLazyImgElems) :
+    
+                            that.imgsrc = $scope.defaultImage;
+    
+                            if (!$scope.onWinLoad) {
+                                $scope.unLoadOnScroll = $scope.unLoadOnScroll === undefined ? true : $scope.unLoadOnScroll;
+                                populateLazyElemsFn(objOfLazyImgElems);
+                            } else {
+                                $scope.unLoadOnScroll = $scope.unLoadOnScroll === undefined ? false : $scope.unLoadOnScroll;
                                 populateLazyElemsFn(objOfOnLoadImgElems);
-
+                            }
+    
                             $timeout.cancel(loadTimeoutId);
                             loadTimeoutId = $timeout(executeWhenAllLoaded, 300);
                         }
                     ],
                     link: function postLink(scope, element, attrs) {}
                 };
-
+    
+            function getDocumentHeight() {
+                var body = document.body,
+                    html = document.documentElement,
+                    height = Math.max(body.scrollHeight, body.offsetHeight,
+                        html.clientHeight, html.scrollHeight, html.offsetHeight);
+    
+                return height;
+            }
+    
             function setImageIfInViewportFn(obj, forceLoad) {
                 var doc = document.documentElement,
                     $windowScrollTop = ($window.pageYOffset || doc.scrollTop) - (doc.clientTop || 0),
-                    $windowHeight = window.outerHeight;
+                    $windowHeight = window.outerHeight,
+                    $documentHeight = getDocumentHeight(),
+                    arrOfPrevDisplayedElementsCopy = arrOfPrevDisplayedElements;
+    
+                arrOfPrevDisplayedElements = [];
+                arrOfPrevDisplayedElementsCopy.forEach(function(item, index) {
+                    var eachElemClientRect = item.elem[0].getBoundingClientRect(),
+                        $elementOffsetTop = eachElemClientRect.top +
+                        ($windowScrollTop - $windowHeight),
+                        offsetTop = (eachElemClientRect.height !== 0 ? $elementOffsetTop : $documentHeight + 10);
+                    if ((offsetTop < $windowScrollTop - $windowHeight - eachElemClientRect.height) || offsetTop > $windowScrollTop) {
+                        item.scope.loaded = false;
+                    }
+                });
                 for (var a in obj) {
                     var eachBlock = obj[a];
-                    if (forceLoad || parseInt(a, 10) < $windowScrollTop + $windowHeight) {
-                        for (var i = 0, len = eachBlock.length; i < len; i++) {
-                            var img = document.createElement('img');
-                            img.src = eachBlock[i].scope.imgsrc;
-                            img.onload = function(eachElem) {
-                                return function() {
-                                    eachElem.that.imgsrc = eachElem.scope.imgsrc;
-                                    eachElem.scope.loaded = true;
-                                    eachElem.scope.$digest();
-                                }
-                            }(eachBlock[i]);
-                        }
-                        delete obj[a];
+                    for (var i = 0, len = eachBlock.length; i < len; i++) {
+                        var img = document.createElement('img');
+                        img.src = eachBlock[i].scope.imgsrc;
+                        img.onload = function(eachElem) {
+                            if (eachElem.scope.unLoadOnScroll) {
+                                arrOfPrevDisplayedElements.push(eachElem);
+                            }
+                            return function() {
+                                eachElem.that.imgsrc = eachElem.scope.imgsrc;
+                                eachElem.scope.loaded = true;
+                                eachElem.scope.$digest();
+                            }
+                        }(eachBlock[i]);
+    
+                        img.onerror = function(eachElem) {
+                            return function() {
+                                eachElem.scope.loaded = true;
+                                eachElem.scope.$digest();
+                            }
+                        }(eachBlock[i]);
                     }
                 }
             }
-
-            function executeWhenAllLoaded() {
-                setImageIfInViewportFn(objOfOnLoadImgElems, true);
-                setImageIfInViewportFn(objOfLazyImgElems, false);
+    
+            function addValueToObjArrProp(obj, prop, value) {
+                if (obj[prop] === undefined) {
+                    obj[prop] = [];
+                }
+    
+                obj[prop].push(value);
             }
-
-            window.addEventListener('scroll', function() {
-                $timeout.cancel(scrollTimeoutId);
-                scrollTimeoutId = $timeout(function() {
-                    setImageIfInViewportFn(objOfLazyImgElems, false);
-                }, 300);
-            }, false);
-
-            window.addEventListener('resize', function() {
-                $timeout.cancel(resizeTimeoutId);
-                resizeTimeoutId = $timeout(function() {
-                    var lazyObjCopy = objOfLazyImgElems;
-                    objOfLazyImgElems = {};
-
-                    for (var a in lazyObjCopy) {
-                        var eachObj = lazyObjCopy[a];
-                        for (var i = 0, len = eachObj.length; i < len; i++) {
-                            var eachElem = eachObj[i],
-                                $elementOffsetTop = eachElem.elem[0].getBoundingClientRect().top;
-                            if (objOfLazyImgElems[$elementOffsetTop] === undefined) {
-                                objOfLazyImgElems[$elementOffsetTop] = [];
-                            }
-
-                            objOfLazyImgElems[$elementOffsetTop].push({
+    
+            function recalculateOffsetFn() {
+                var lazyObjCopy = objOfLazyImgElems,
+                    doc = document.documentElement,
+                    $windowScrollTop = ($window.pageYOffset || doc.scrollTop) - (doc.clientTop || 0),
+                    $windowHeight = window.outerHeight,
+                    $documentHeight = getDocumentHeight();
+                objOfLazyImgElemsInViewport = {};
+                objOfLazyImgElems = {};
+    
+                for (var a in lazyObjCopy) {
+                    var eachObj = lazyObjCopy[a];
+                    for (var i = 0, len = eachObj.length; i < len; i++) {
+                        var eachElem = eachObj[i],
+                            eachElemClientRect = eachElem.elem[0].getBoundingClientRect(),
+                            $elementOffsetTop = eachElemClientRect.top +
+                            ($windowScrollTop - $windowHeight),
+                            offsetTop = (eachElemClientRect.height !== 0 ? $elementOffsetTop : $documentHeight + 10),
+                            newEachElemObj = {
                                 'that': eachElem.that,
                                 'scope': eachElem.scope,
                                 'elem': eachElem.elem
-                            });
+                            };
+    
+                        addValueToObjArrProp(objOfLazyImgElems, offsetTop, newEachElemObj);
+    
+                        if ((offsetTop >= $windowScrollTop - $windowHeight - eachElemClientRect.height) && offsetTop < $windowScrollTop) {
+                            addValueToObjArrProp(objOfLazyImgElemsInViewport, offsetTop, newEachElemObj);
                         }
                     }
-
-                    setImageIfInViewportFn(objOfLazyImgElems, false);
+                }
+            }
+    
+            function executeWhenAllLoaded() {
+                setImageIfInViewportFn(objOfOnLoadImgElems, true);
+                recalculateOffsetFn();
+                setImageIfInViewportFn(objOfLazyImgElemsInViewport, false);
+            }
+    
+            window.addEventListener('scroll', function() {
+                $timeout.cancel(scrollTimeoutId);
+                scrollTimeoutId = $timeout(function() {
+                    recalculateOffsetFn();
+                    setImageIfInViewportFn(objOfLazyImgElemsInViewport, false);
                 }, 300);
             }, false);
-
+    
+            window.addEventListener('resize', function() {
+                $timeout.cancel(resizeTimeoutId);
+                resizeTimeoutId = $timeout(function() {
+                    recalculateOffsetFn();
+                    setImageIfInViewportFn(objOfLazyImgElemsInViewport, false);
+                }, 300);
+            }, false);
+    
             return ngLazyLoadImg;
         }]);
 }(window, document);
