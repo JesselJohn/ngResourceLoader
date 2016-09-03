@@ -2,6 +2,7 @@
 
 /*!
  * Jessel John - May, 04, 2014
+ * https://github.com/JesselJohn
  * MIT Licence
  */
 ! function(window, document, undefined) {
