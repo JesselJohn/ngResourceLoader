@@ -1,7 +1,6 @@
 .lazy-img {
-    -webkit-transition: 0.4s ease opacity;
-    -o-transition: 0.4s ease opacity;
     transition: 0.4s ease opacity;
+    transform: translate3d(0, 0, 0);
     will-change: opacity;
     &.lazy-smooth-load {
         opacity: 0;
