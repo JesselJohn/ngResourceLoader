@@ -52,8 +52,8 @@
                         bindToController: true,
                         template: function(elem, attrs) {
                             return attrs.elemType == 'img' ?
-                                "<img class='lazy-img' ng-src=\"{{tyShow.loaded && tyShow.imgsrc || tyShow.imgsrcRef}}\" ng-class=\"{'show':tyShow.loaded}\"></img>" :
-                                "<div class='lazy-img' ng-style=\"{'background-image':'url('+(tyShow.loaded && tyShow.imgsrc || tyShow.imgsrcRef)+')'}\" ng-class=\"{'show':tyShow.loaded}\"></div>";
+                                "<img class='lazy-img' ng-src=\"{{tyShow.loaded && !tyShow.imgError && tyShow.imgsrc || tyShow.imgsrcRef}}\" ng-class=\"{'show':tyShow.loaded}\"></img>" :
+                                "<div class='lazy-img' ng-style=\"{'background-image':'url('+(tyShow.loaded && !tyShow.imgError && tyShow.imgsrc || tyShow.imgsrcRef)+')'}\" ng-class=\"{'show':tyShow.loaded}\"></div>";
                         },
                         restrict: 'E',
                         controllerAs: 'tyShow',
@@ -230,6 +230,9 @@
                         });
 
                         item.elem[0].onload = function(e) {
+                            if (item.self.imgsrcRef == item.self.defaultImage) {
+                                return;
+                            }
                             item.self.isImageLoaded = true;
                             item.self.isImageLoadedTracker = true;
                             item.self.imgError = false;
@@ -338,15 +341,11 @@
 
                 window.addEventListener('scroll', function() {
                     $timeout.cancel(scrollTimeoutId);
-                    scrollTimeoutId = $timeout(function() {
-                        setImageForElemsInArrayFn();
-                    }, 10, false);
+                    scrollTimeoutId = $timeout(setImageForElemsInArrayFn, 10, false);
                 }, false);
 
                 $rootScope.$on('trigger.ngLazyImg', function(event, timeout = 0) {
-                    $timeout(function() {
-                        setImageForElemsInArrayFn();
-                    }, timeout);
+                    $timeout(setImageForElemsInArrayFn, timeout);
                 });
 
                 return ngLazyLoadImg;
