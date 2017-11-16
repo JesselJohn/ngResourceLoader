@@ -1,3 +1,10 @@
+'use strict';
+
+/*!
+ * Jessel John - May, 04, 2014 - present
+ * https://github.com/JesselJohn
+ * MIT Licence
+ */
 ! function(window, document, angular, undefined) {
     angular.module('ngLazyImg', [])
         .directive('ngLazyLoadImgParent', [function() {
