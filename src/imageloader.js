@@ -1,10 +1,3 @@
-'use strict';
-
-/*!
- * Jessel John - May, 04, 2014
- * https://github.com/JesselJohn
- * MIT Licence
- */
 ! function(window, document, angular, undefined) {
     angular.module('ngLazyImg', [])
         .directive('ngLazyLoadImgParent', [function() {
@@ -219,6 +212,15 @@
                     if (!item.self.imgsrc) {
                         item.self.imgsrcRef = item.self.defaultImage;
                         item.self.loaded = true;
+                        item.self.imgError = false;
+                        item.self.isImageLoaded = true;
+                        item.self.isImageLoadedTracker = true;
+                        triggerImageInViewportFn({
+                            item: item,
+                            windowValues: getWindowValuesFn(),
+                            error: false
+                        }, true);
+                        triggerGlobalDigestFn();
                         return;
                     }
 
